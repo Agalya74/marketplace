@@ -1,28 +1,25 @@
 const express = require("express");
 const router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
-const { isValidObjectId } = require("../middleware/validateObjectId");
 
-// ✅ Correct Import from Controller
-const cartController = require("../controllers/cartController");
+const {
+  addToCart,
+  removeFromCart,
+  getCart
+} = require("../controllers/cartController");
 
-const addToCart = cartController.addToCart;
-const getCart = cartController.getCart;
-const removeFromCart = cartController.removeFromCart;
+// ✅ Add to cart
+router.post("/", protect, addToCart);
 
-console.log({ addToCart, getCart, removeFromCart });
+// ✅ Remove from cart
+router.delete("/:productId", protect, (req, res, next) => {
+  if (!req.params.productId) {
+    return res.status(400).json({ message: "Product ID is required" });
+  }
+  next();  // Proceed to the removeFromCart controller if productId is valid
+}, removeFromCart);
 
-
-// ✅ Log controllers for debugging
-console.log({ addToCart, getCart, removeFromCart });
-
-// ✅ Add to Cart
-router.post("/:productId", protect, isValidObjectId, addToCart);
-
-// ✅ Get Cart
+// ✅ Get all cart items
 router.get("/", protect, getCart);
-
-// ✅ Remove from Cart
-router.delete("/:productId", protect, isValidObjectId, removeFromCart);
 
 module.exports = router;

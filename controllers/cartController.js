@@ -1,106 +1,88 @@
 const Cart = require("../models/Cart");
-const Product = require("../models/Product");
-const mongoose = require("mongoose");
 
-// ✅ Add to Cart
+// ✅ Add to cart
 const addToCart = async (req, res) => {
-  const { productId } = req.params;
+  const { productId, quantity } = req.body;
 
-  if (!mongoose.isValidObjectId(productId)) {
-    return res.status(400).json({ message: "Invalid product ID" });
+  if (!productId || !quantity || quantity <= 0) {
+    return res.status(400).json({ message: "Invalid product ID or quantity" });
   }
 
   try {
-    const product = await Product.findById(productId);
+    // ✅ Check if the product is already in the cart
+    const cartItem = await Cart.findOne({ user: req.user.id, product: productId });
 
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+    if (cartItem) {
+      // ✅ Increment quantity if item exists
+      cartItem.quantity += quantity;
+      await cartItem.save();
+
+      const populatedCartItem = await cartItem.populate("product").execPopulate();
+      
+      return res.status(200).json(populatedCartItem);
     }
 
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    // ✅ Create a new cart item
+    const newItem = new Cart({
+      user: req.user.id,
+      product: productId,
+      quantity
+    });
 
-    let cart = await Cart.findOne({ user: req.user.id });
+    await newItem.save();
+    const populatedNewItem = await newItem.populate("product").execPopulate();
 
-    if (!cart) {
-      cart = new Cart({ user: req.user.id, products: [] });
-    }
-
-    const existingProduct = cart.products.find((p) =>
-      p.product.equals(productId)
-    );
-
-    if (existingProduct) {
-      existingProduct.quantity += 1;
-    } else {
-      cart.products.push({ product: productId, quantity: 1 });
-    }
-
-    await cart.save();
-    res.status(201).json({ message: "Added to cart", cart });
+    res.status(201).json(populatedNewItem);
 
   } catch (error) {
     console.error("🔥 Error adding to cart:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// ✅ Get Cart
-const getCart = async (req, res) => {
+// ✅ Remove from cart
+const removeFromCart = async (req, res) => {
+  const { productId } = req.params;
+
+  if (!productId) {
+    return res.status(400).json({ message: "Product ID is required" });
+  }
+
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: "Unauthorized" });
+    const deleted = await Cart.findOneAndDelete({
+      user: req.user.id,
+      product: productId
+    });
+
+    if (!deleted) {
+      return res.status(404).json({ message: "Cart item not found" });
     }
 
-    const cart = await Cart.findOne({ user: req.user.id }).populate("products.product", "name price imageUrl");
+    res.status(200).json({ message: "Removed from cart" });
 
-    if (!cart || cart.products.length === 0) {
-      return res.status(404).json({ message: "Cart is empty" });
+  } catch (error) {
+    console.error("🔥 Error removing from cart:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+// ✅ Get all cart items
+const getCart = async (req, res) => {
+  try {
+    const cart = await Cart.find({ user: req.user.id })
+      .populate("product")  // ✅ Populate product details
+      .exec();
+
+    if (!cart.length) {
+      return res.status(404).json({ message: "No items in cart" });
     }
 
     res.status(200).json(cart);
 
   } catch (error) {
     console.error("🔥 Error fetching cart:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// ✅ Remove from Cart
-const removeFromCart = async (req, res) => {
-  const { productId } = req.params;
-
-  if (!mongoose.isValidObjectId(productId)) {
-    return res.status(400).json({ message: "Invalid product ID" });
-  }
-
-  try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    let cart = await Cart.findOne({ user: req.user.id });
-
-    if (!cart) {
-      return res.status(404).json({ message: "Cart not found" });
-    }
-
-    cart.products = cart.products.filter(
-      (p) => !p.product.equals(productId)
-    );
-
-    await cart.save();
-    res.status(200).json({ message: "Removed from cart", cart });
-
-  } catch (error) {
-    console.error("🔥 Error removing from cart:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-module.exports = {
-  addToCart,
-  getCart,
-  removeFromCart,
-};
+module.exports = { addToCart, removeFromCart, getCart };

@@ -1,26 +1,18 @@
 const mongoose = require("mongoose");
 
-const favoriteSchema = new mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Product",
-      required: true,
-    }
+const favoriteSchema = mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',  // assuming you have a User model
+    required: true,
   },
-  { timestamps: true }   // ✅ Automatically adds createdAt & updatedAt
-);
+  product: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',  // assuming you have a Product model
+    required: true,
+  },
+}, { timestamps: true });
 
-// ✅ Compound index to prevent duplicate favorites
-favoriteSchema.index({ user: 1, product: 1 }, { unique: true });
+const Favorite = mongoose.model("Favorite", favoriteSchema);
 
-// ✅ Improve query performance with individual indexes
-favoriteSchema.index({ user: 1 });
-favoriteSchema.index({ product: 1 });
-
-module.exports = mongoose.model("Favorite", favoriteSchema);
+module.exports = Favorite;

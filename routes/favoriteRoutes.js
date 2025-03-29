@@ -2,20 +2,19 @@ const express = require("express");
 const router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
 
-// ✅ Import the controller functions
 const {
-  addFavorite,
+  addToFavorites,
+  removeFromFavorites,
   getFavorites,
-  removeFavorite,
 } = require("../controllers/favoriteController");
 
-// ✅ Add product to favorites
-router.post("/", protect, addFavorite);
+// ✅ Add to favorites with `userId`
+router.post("/", protect, addToFavorites);
 
-// ✅ Get all favorite products (NO userId in the route)
-router.get("/", protect, getFavorites);
+// ✅ Remove from favorites with `userId` in the URL
+router.delete("/:userId/:productId", protect, removeFromFavorites);
 
-// ✅ Remove product from favorites
-router.delete("/:productId", protect, removeFavorite);
+// ✅ Get all favorites for a user
+router.get("/:userId", protect, getFavorites);
 
 module.exports = router;
