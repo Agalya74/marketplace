@@ -1,27 +1,29 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
 
-// ✅ Helper Functions
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-
+// ✅ Helper Function for Token Generation
 const generateToken = (user) => {
-  return jwt.sign(
-    { id: user._id, email: user.email, name: user.name },
-    process.env.JWT_SECRET,
-    { expiresIn: "30d" }
-  );
+  try {
+    return jwt.sign(
+      { id: user._id, email: user.email, name: user.name },
+      process.env.JWT_SECRET,
+      { expiresIn: "30d" }
+    );
+  } catch (error) {
+    console.error("🔥 JWT Token Generation Failed:", error);
+    return null;  // Return null if token generation fails
+  }
 };
 
 // ===============================
 // ✅ Register User
 // ===============================
 const registerUser = async (req, res) => {
-  const { name, email, password, phone, avatar, address } = req.body;
+  const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
-    return res.status(400).json({ message: "Name, email, and password are required" });
+    return res.status(400).json({ message: "All fields are required" });
   }
 
   try {
@@ -31,36 +33,37 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // ✅ Hash the password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
-      phone,
-      avatar,
-      address,
-      favorites: [],
-      cart: [],
     });
+
+    console.log("✅ User created successfully:", user);
+
+    // ✅ Token generation
+    const token = generateToken(user);
+    
+    if (!token) {
+      return res.status(500).json({ message: "Token generation failed" });
+    }
 
     res.status(201).json({
       message: "User registered successfully",
       user: {
         _id: user._id,
         name: user.name,
-        email: user.email,
-        phone: user.phone,
-        avatar: user.avatar,
-        address: user.address,
-        favorites: user.favorites,
-        cart: user.cart,
-        token: generateToken(user),
-      }
+        email: user.email
+      },
+      token
     });
 
   } catch (error) {
-    console.error("🔥 Error during registration:", error);
+    console.error("🔥 Server Error during registration:", error.message);
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
@@ -78,8 +81,20 @@ const loginUser = async (req, res) => {
   try {
     const user = await User.findOne({ email });
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
+    if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    const token = generateToken(user);
+
+    if (!token) {
+      return res.status(500).json({ message: "Token generation failed" });
     }
 
     res.status(200).json({
@@ -87,18 +102,13 @@ const loginUser = async (req, res) => {
       user: {
         _id: user._id,
         name: user.name,
-        email: user.email,
-        phone: user.phone,
-        avatar: user.avatar,
-        address: user.address,
-        favorites: user.favorites,
-        cart: user.cart,
-        token: generateToken(user),
-      }
+        email: user.email
+      },
+      token
     });
 
   } catch (error) {
-    console.error("🔥 Error during login:", error);
+    console.error("🔥 Server Error during login:", error.message);
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
@@ -108,7 +118,7 @@ const loginUser = async (req, res) => {
 // ===============================
 const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).select("-password");
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -116,16 +126,7 @@ const getUserProfile = async (req, res) => {
 
     res.status(200).json({
       message: "User profile fetched successfully",
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        avatar: user.avatar,
-        address: user.address,
-        favorites: user.favorites,
-        cart: user.cart,
-      }
+      user
     });
 
   } catch (error) {
@@ -145,12 +146,15 @@ const updateUserProfile = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const { name, phone, avatar, address } = req.body;
+    const { name, email, password } = req.body;
+
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
+    }
 
     user.name = name || user.name;
-    user.phone = phone || user.phone;
-    user.avatar = avatar || user.avatar;
-    user.address = address || user.address;
+    user.email = email || user.email;
 
     await user.save();
 
@@ -159,11 +163,7 @@ const updateUserProfile = async (req, res) => {
       user: {
         _id: user._id,
         name: user.name,
-        phone: user.phone,
-        avatar: user.avatar,
-        address: user.address,
-        favorites: user.favorites,
-        cart: user.cart,
+        email: user.email
       }
     });
 
@@ -173,12 +173,10 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
-// ===============================
 // ✅ Export Controllers
-// ===============================
 module.exports = {
   registerUser,
   loginUser,
   getUserProfile,
-  updateUserProfile,
+  updateUserProfile
 };

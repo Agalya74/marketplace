@@ -1,15 +1,17 @@
 const mongoose = require("mongoose");
 
-// ✅ Export it with the same name
+// ✅ Middleware to Validate Object ID
 const isValidObjectId = (req, res, next) => {
-  const id = req.params.id || req.params.productId;
+  // 🔥 Support multiple ID sources (params & body)
+  const id = req.params.id || req.params.productId || req.body.id;
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  // ✅ Check if ID is provided
+  if (!id || !mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: "❌ Invalid ID format" });
   }
 
   next();
 };
 
-// ✅ Export using the correct name
+// ✅ Export Middleware
 module.exports = { isValidObjectId };

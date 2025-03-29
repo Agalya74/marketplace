@@ -17,6 +17,10 @@ const addToCart = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     let cart = await Cart.findOne({ user: req.user.id });
 
     if (!cart) {
@@ -45,6 +49,10 @@ const addToCart = async (req, res) => {
 // ✅ Get Cart
 const getCart = async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     const cart = await Cart.findOne({ user: req.user.id }).populate("products.product", "name price imageUrl");
 
     if (!cart || cart.products.length === 0) {
@@ -68,6 +76,10 @@ const removeFromCart = async (req, res) => {
   }
 
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     let cart = await Cart.findOne({ user: req.user.id });
 
     if (!cart) {
@@ -87,7 +99,8 @@ const removeFromCart = async (req, res) => {
   }
 };
 
-// ✅ Export functions properly
-exports.addToCart = addToCart;
-exports.getCart = getCart;
-exports.removeFromCart = removeFromCart;
+module.exports = {
+  addToCart,
+  getCart,
+  removeFromCart,
+};

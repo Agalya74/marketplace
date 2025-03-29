@@ -15,7 +15,7 @@ const addFavorite = async (req, res) => {
       return res.status(400).json({ message: "Invalid product ID" });
     }
 
-    const product = await Product.findById(productId);
+    const product = await Product.findById(productId).lean();
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -23,7 +23,7 @@ const addFavorite = async (req, res) => {
     const existingFavorite = await Favorite.findOne({
       user: req.user.id,
       product: productId,
-    });
+    }).lean();
 
     if (existingFavorite) {
       return res.status(400).json({ message: "Product already in favorites" });
@@ -35,7 +35,6 @@ const addFavorite = async (req, res) => {
     });
 
     res.status(201).json({ message: "Added to favorites", favorite: newFavorite });
-
   } catch (error) {
     console.error("🔥 Error adding favorite:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -53,7 +52,12 @@ const getFavorites = async (req, res) => {
       .populate({
         path: "product",
         select: "name price imageUrl",
-      });
+      })
+      .lean();
+
+    if (!favorites || favorites.length === 0) {
+      return res.status(404).json({ message: "No favorites found" });
+    }
 
     const products = favorites.map((fav) => ({
       _id: fav.product._id,
@@ -63,7 +67,6 @@ const getFavorites = async (req, res) => {
     }));
 
     res.status(200).json(products);
-
   } catch (error) {
     console.error("🔥 Error getting favorites:", error);
     res.status(500).json({ message: "Server Error", error: error.message });
@@ -93,7 +96,6 @@ const removeFavorite = async (req, res) => {
     }
 
     res.status(200).json({ message: "Removed from favorites" });
-
   } catch (error) {
     console.error("🔥 Error removing favorite:", error);
     res.status(500).json({ message: "Server Error", error: error.message });

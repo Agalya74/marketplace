@@ -7,7 +7,7 @@ const {
   registerUser,
   loginUser,
   getUserProfile,
-  updateUserProfile,
+  updateUserProfile
 } = require("../controllers/userController");
 
 // ================================

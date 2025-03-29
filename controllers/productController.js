@@ -8,25 +8,29 @@ const getProducts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const sort = req.query.sort || "createdAt";
 
+    const totalProducts = await Product.countDocuments();
+
     const products = await Product.find()
-      .sort({ [sort]: -1 })          // ✅ Sorting
-      .skip((page - 1) * limit)      // ✅ Pagination
-      .limit(limit);
+      .sort({ [sort]: -1 })           // ✅ Sorting by specified field
+      .skip((page - 1) * limit)        // ✅ Pagination logic
+      .limit(limit)
+      .lean();                         // ✅ Faster performance
 
     if (products.length === 0) {
       return res.status(404).json({ message: "No products found" });
     }
 
     res.status(200).json({
-      total: products.length,
+      totalProducts,
       page,
       limit,
+      hasNextPage: page * limit < totalProducts,
+      hasPrevPage: page > 1,
       products,
     });
-
   } catch (error) {
     console.error("🔥 Error fetching products:", error);
-    res.status(500).json({ message: "Server Error" });
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
@@ -39,17 +43,16 @@ const getProductById = async (req, res) => {
   }
 
   try {
-    const product = await Product.findById(id);
+    const product = await Product.findById(id).lean();
 
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
     res.status(200).json(product);
-
   } catch (error) {
     console.error("🔥 Error fetching product:", error);
-    res.status(500).json({ message: "Server Error" });
+    res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
 
@@ -57,7 +60,6 @@ const getProductById = async (req, res) => {
 const createProduct = async (req, res) => {
   const { name, description, price, imageUrl, category, countInStock } = req.body;
 
-  // ✅ Input Validation
   if (!name || !price || !imageUrl || !category || countInStock == null) {
     return res.status(400).json({ message: "All fields are required" });
   }
@@ -74,10 +76,9 @@ const createProduct = async (req, res) => {
 
     const savedProduct = await product.save();
     res.status(201).json(savedProduct);
-
   } catch (error) {
     console.error("🔥 Error creating product:", error);
-    res.status(500).json({ message: "Failed to create product" });
+    res.status(500).json({ message: "Failed to create product", error: error.message });
   }
 };
 
@@ -94,17 +95,16 @@ const updateProduct = async (req, res) => {
       id,
       { $set: req.body },
       { new: true, runValidators: true }
-    );
+    ).lean();
 
     if (!updatedProduct) {
       return res.status(404).json({ message: "Product not found" });
     }
 
     res.status(200).json(updatedProduct);
-
   } catch (error) {
     console.error("🔥 Error updating product:", error);
-    res.status(500).json({ message: "Failed to update product" });
+    res.status(500).json({ message: "Failed to update product", error: error.message });
   }
 };
 
@@ -117,17 +117,16 @@ const deleteProduct = async (req, res) => {
   }
 
   try {
-    const deletedProduct = await Product.findByIdAndDelete(id);
+    const deletedProduct = await Product.findByIdAndDelete(id).lean();
 
     if (!deletedProduct) {
       return res.status(404).json({ message: "Product not found" });
     }
 
     res.status(200).json({ message: "Product removed", deletedProduct });
-
   } catch (error) {
     console.error("🔥 Error deleting product:", error);
-    res.status(500).json({ message: "Failed to delete product" });
+    res.status(500).json({ message: "Failed to delete product", error: error.message });
   }
 };
 
